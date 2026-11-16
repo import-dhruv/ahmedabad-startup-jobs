@@ -37,3 +37,9 @@ resumes/
 .idea/
 .vscode/
 *.swp
+
+# Celery runtime state
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+*.pid
