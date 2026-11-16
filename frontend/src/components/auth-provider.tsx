@@ -81,8 +81,15 @@ function writeSession(session: Session | null) {
   notify();
 }
 
+// During SSR and hydration the snapshot is false, so protected pages wait for
+// the client to read localStorage before deciding whether to redirect.
+const subscribeHydrated = () => () => undefined;
+const readHydrated = () => typeof window !== "undefined";
+const serverHydrated = () => false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const session = React.useSyncExternalStore(subscribe, readSession, () => null);
+  const hydrated = React.useSyncExternalStore(subscribeHydrated, readHydrated, serverHydrated);
   const token = session?.token ?? null;
 
   // Keep the stored user fresh. The session itself is never mirrored into
@@ -109,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user: session?.user ?? null,
       token,
-      loading: false,
+      loading: !hydrated,
       async login(email, password) {
         const res = await authApi.login({ email, password });
         writeSession({ token: res.access_token, user: res.user });
@@ -126,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         writeSession(null);
       },
     }),
-    [session, token],
+    [session, token, hydrated],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
