@@ -40,7 +40,6 @@ GUJARAT_CITIES: dict[str, str] = {
     "anand": "Gujarat",
     "vapi": "Gujarat",
     "valsad": "Gujarat",
-    "gandhinagar": "Gujarat",
     "nadiad": "Gujarat",
     "morbi": "Gujarat",
     "bhuj": "Gujarat",
@@ -109,13 +108,6 @@ INDIAN_CITIES: dict[str, str] = {
     "udaipur": "Rajasthan",
     "agra": "Uttar Pradesh",
     "varanasi": "Uttar Pradesh",
-    "bhopal": "Madhya Pradesh",
-    "mysore": "Karnataka",
-    "ahmedabad": "Gujarat",
-    "surat": "Gujarat",
-    "vadodara": "Gujarat",
-    "rajkot": "Gujarat",
-    "gandhinagar": "Gujarat",
 }
 
 CITY_TO_STATE: dict[str, str] = {**INDIAN_CITIES, **GUJARAT_CITIES}

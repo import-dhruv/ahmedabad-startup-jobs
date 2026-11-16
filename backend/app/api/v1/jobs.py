@@ -2,17 +2,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import String, and_, case, cast, func, or_, select
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession, OptionalUser, PaginationDep
-from app.models import JobListing, JobSkill, JobSource, Skill, Startup, User, UserJobView
+from app.models import JobListing, JobSkill, Skill, Startup, UserJobView
 from app.models.enums import JobStatus, VerificationStatus
 from app.schemas import (
     JobDetail,
@@ -165,7 +164,7 @@ def _build_filters(
     if verified_only:
         clauses.append(JobListing.verification_status == VerificationStatus.VERIFIED)
     if posted_within_days:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=posted_within_days)
+        cutoff = datetime.now(UTC) - timedelta(days=posted_within_days)
         clauses.append(func.coalesce(JobListing.posted_at, JobListing.discovered_at) >= cutoff)
     if startup_id:
         clauses.append(JobListing.startup_id == startup_id)

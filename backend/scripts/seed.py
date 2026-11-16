@@ -11,7 +11,6 @@ import argparse
 import asyncio
 import os
 import sys
-from datetime import datetime, timezone
 
 from sqlalchemy import func, select
 
@@ -21,7 +20,6 @@ from app.core.logging import get_logger  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.ingestion.discovery import (  # noqa: E402
-    candidate_slugs,
     detect_ats_slugs_from_pages,
     discover_from_yc,
     probe_ats_boards,
@@ -45,26 +43,10 @@ AGGREGATOR_SOURCES: list[dict] = [
         "interval_minutes": 60,
     },
     {
-        "name": "Remotive",
-        "slug": "remotive",
-        "connector_type": "remotive",
-        "base_url": "https://remotive.com/api/remote-jobs",
-        "priority": 60,
-        "interval_minutes": 60,
-    },
-    {
         "name": "Arbeitnow",
         "slug": "arbeitnow",
         "connector_type": "arbeitnow",
         "base_url": "https://www.arbeitnow.com/api/job-board-api",
-        "priority": 60,
-        "interval_minutes": 120,
-    },
-    {
-        "name": "Jobicy",
-        "slug": "jobicy",
-        "connector_type": "jobicy",
-        "base_url": "https://jobicy.com/api/v2/remote-jobs",
         "priority": 60,
         "interval_minutes": 120,
     },
@@ -264,12 +246,20 @@ CANDIDATE_DOMAINS: list[str] = [
 ]
 
 
-async def ensure_aggregator_sources(session) -> None:
+async def ensure_aggregator_sources(session, client: PoliteClient | None = None) -> None:
+    """Register the public feeds, skipping any whose robots.txt forbids reading them."""
     for spec in AGGREGATOR_SOURCES:
+        if client is not None:
+            allowed = await client._robots_allows(spec["base_url"])
+            if not allowed:
+                log.warning("source_skipped_robots", slug=spec["slug"], url=spec["base_url"])
+                continue
         existing = (
             await session.execute(select(JobSource).where(JobSource.slug == spec["slug"]))
         ).scalar_one_or_none()
         if existing is not None:
+            if not existing.is_active:
+                existing.is_active = True
             continue
         config = {"connector_type": spec["connector_type"]}
         session.add(
@@ -311,7 +301,12 @@ async def ensure_admin(session, email: str, password: str, name: str) -> None:
     log.info("admin_created", email=email)
 
 
-async def discover_and_register(session, client: PoliteClient, probe_client: PoliteClient | None = None, limit_domains: int = 120) -> dict:
+async def discover_and_register(
+    session,
+    client: PoliteClient,
+    probe_client: PoliteClient | None = None,
+    limit_domains: int = 120,
+) -> dict:
     """Discover companies and register any job boards we can reach."""
     companies = await discover_from_yc(
         client, queries=["india", "gujarat", "ahmedabad", "gandhinagar"], max_pages=3
@@ -365,7 +360,7 @@ async def discover_and_register(session, client: PoliteClient, probe_client: Pol
 
     probed = await asyncio.gather(*(probe_one(domain) for domain in all_domains))
 
-    for domain, hits in zip(all_domains, probed):
+    for domain, hits in zip(all_domains, probed, strict=False):
         for hit in hits:
             source_slug = (
                 f"workday-{hit['slug'].split('|')[0]}"
@@ -428,7 +423,8 @@ async def discover_from_ingested_jobs(session, client, probe_client=None, limit:
         .where(JobListing.geo_scope.in_(["ahmedabad", "gujarat", "india_remote", "india"]))
         .limit(4000)
     )
-    for company, apply_url, scope in (await session.execute(stmt)).all():
+    rows = (await session.execute(stmt)).all()
+    for company, apply_url, _scope in rows:
         if not apply_url:
             continue
         host = urlparse(apply_url).netloc.lower()
@@ -457,7 +453,7 @@ async def discover_from_ingested_jobs(session, client, probe_client=None, limit:
     items = list(domains.items())[:limit]
     probed = await asyncio.gather(*(probe_one(domain, name) for domain, name in items))
 
-    for (domain, company_name), hits in zip(items, probed):
+    for (domain, company_name), hits in zip(items, probed, strict=False):
         for hit in hits:
             source_slug = f"{hit['kind']}-{hit['slug']}"
             exists = (
@@ -571,7 +567,8 @@ async def main() -> None:
     args = parser.parse_args()
 
     async with SessionLocal() as session:
-        await ensure_aggregator_sources(session)
+        async with PoliteClient(rate_limit_per_host=30) as boot_client:
+            await ensure_aggregator_sources(session, boot_client)
         await ensure_admin(session, args.admin_email, args.admin_password, args.admin_name)
 
         summary: dict = {}

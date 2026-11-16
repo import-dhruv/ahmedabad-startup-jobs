@@ -127,7 +127,8 @@ async def discover_from_yc(
                     industry=_infer_indry_from_tags(company.get("tags") or company.get("industries")),
                     size_range=_yc_size(company.get("teamSize")),
                     discovery_source="yc_directory",
-                    evidence_url=company.get("url") or f"https://www.ycombinator.com/companies/{company.get('slug', '')}",
+                    evidence_url=company.get("url")
+                    or f"https://www.ycombinator.com/companies/{company.get('slug', '')}",
                     extra={
                         "batch": company.get("batch"),
                         "tags": company.get("tags") or [],

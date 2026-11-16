@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession
 from app.api.v1.jobs import _job_to_summary
@@ -11,8 +13,6 @@ from app.models import JobListing, Startup
 from app.models.enums import JobStatus
 from app.schemas import DashboardStats, HiringInsight
 from app.services import analytics
-from sqlalchemy import func, or_, select
-from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import html
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.logging import get_logger
@@ -214,7 +214,7 @@ class HackerNewsConnector(Connector):
             location_raw=location,
             experience_level=_guess_experience(text),
             employment_type=_guess_employment(text),
-            posted_at=datetime.fromtimestamp(comment.get("created_at_i", 0), tz=timezone.utc)
+            posted_at=datetime.fromtimestamp(comment.get("created_at_i", 0), tz=UTC)
             if comment.get("created_at_i")
             else None,
             raw={

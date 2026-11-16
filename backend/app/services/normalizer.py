@@ -166,7 +166,7 @@ EXPERIENCE_PATTERNS: list[tuple[str, float, float]] = [
 
 
 def detect_experience(title: str | None, description: str | None) -> tuple[str | None, float | None, float | None]:
-    from app.models.enums import EXPERIENCE_ORDER, ExperienceLevel
+    from app.models.enums import ExperienceLevel
 
     title_l = (title or "").lower()
     body = f"{title or ''}\n{description or ''}".lower()
@@ -276,7 +276,6 @@ def canonical_employment_type(value: str | None) -> str | None:
 
 
 def detect_employment_type(title: str | None, description: str | None) -> str | None:
-    from app.models.enums import EmploymentType
 
     title_l = (title or "").lower()
     body = (description or "").lower()
@@ -317,7 +316,9 @@ SALARY_PATTERNS = [
 ]
 
 
-def detect_salary(description: str | None, title: str | None = None) -> tuple[int | None, int | None, str | None, str | None]:
+def detect_salary(
+    description: str | None, title: str | None = None
+) -> tuple[int | None, int | None, str | None, str | None]:
     """Return (min, max, currency, period) only when the text explicitly states a range."""
     if not description:
         return None, None, None, None
@@ -388,7 +389,7 @@ def extract_skills(text: str | None, title: str | None = None) -> list[tuple[str
     hay = haystack.lower()
     found: dict[str, float] = {}
 
-    for canonical, (category, is_ai) in SKILL_CATALOG.items():
+    for canonical in SKILL_CATALOG:
         pattern = rf"(?<![a-z0-9]){re.escape(canonical.lower())}(?![a-z0-9])"
         if re.search(pattern, hay):
             found[canonical] = 1.0 if canonical.lower() in (title or "").lower() else 0.9

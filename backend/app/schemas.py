@@ -20,7 +20,7 @@ class TokenResponse(BaseModel):
     refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
-    user: "UserRead"
+    user: UserRead
 
 
 class UserRegister(BaseModel):
@@ -112,9 +112,9 @@ class StartupRead(ORMModel):
 
 
 class StartupDetail(StartupRead):
-    founders: list["FounderRead"] = Field(default_factory=list)
-    funding_rounds: list["FundingRead"] = Field(default_factory=list)
-    recent_jobs: list["JobSummary"] = Field(default_factory=list)
+    founders: list[FounderRead] = Field(default_factory=list)
+    funding_rounds: list[FundingRead] = Field(default_factory=list)
+    recent_jobs: list[JobSummary] = Field(default_factory=list)
 
 
 class FounderRead(ORMModel):
@@ -208,7 +208,7 @@ class JobDetail(JobSummary):
     department: str | None = None
     deadline: date | None = None
     content_hash: str | None = None
-    references: list["JobReferenceRead"] = Field(default_factory=list)
+    references: list[JobReferenceRead] = Field(default_factory=list)
     startup: StartupRead | None = None
 
 

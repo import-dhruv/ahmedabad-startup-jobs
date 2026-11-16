@@ -33,7 +33,7 @@ class User(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    profile: Mapped["CandidateProfile | None"] = relationship(
+    profile: Mapped[CandidateProfile | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 

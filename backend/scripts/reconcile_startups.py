@@ -20,6 +20,7 @@ from app.core.logging import get_logger  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models import JobListing, JobSource, Startup  # noqa: E402
 from app.services.dedup import company_key  # noqa: E402
+from app.services.normalizer import detect_industry  # noqa: E402
 from app.services.taxonomy import slugify  # noqa: E402
 
 log = get_logger(__name__)
@@ -46,24 +47,29 @@ async def main() -> None:
         jobs = (await session.execute(select(JobListing))).scalars().all()
         log.info("jobs_loaded", count=len(jobs))
 
-        # company key -> (display name, most common domain, job ids)
+        # company key -> (display name, most common domain, job ids, skills text)
         buckets: dict[str, dict] = {}
         for job in jobs:
             key = company_key(job.company_name) or slugify(job.company_name)
             if not key:
                 continue
             bucket = buckets.setdefault(
-                key, {"name": job.company_name, "domains": Counter(), "jobs": [], "scopes": Counter()}
+                key,
+                {"name": job.company_name, "domains": Counter(), "jobs": [], "scopes": Counter(), "text": []},
             )
             domain = _domain_for(job.apply_url) or _domain_for(job.original_url)
             if domain:
                 bucket["domains"][domain] += 1
             bucket["jobs"].append(job.id)
             bucket["scopes"][job.geo_scope] += 1
+            if job.title:
+                bucket["text"].append(job.title)
+            if job.skills_text:
+                bucket["text"].append(job.skills_text)
 
         created = 0
         linked = 0
-        for key, bucket in buckets.items():
+        for bucket in buckets.values():
             slug = slugify(bucket["name"])
             if not slug:
                 continue
@@ -73,12 +79,15 @@ async def main() -> None:
             domain = bucket["domains"].most_common(1)[0][0] if bucket["domains"] else None
             website = f"https://{domain}" if domain else None
 
+            # Infer the industry from the roles we have actually seen for them.
+            inferred = detect_industry(" ".join(bucket["text"][:40])) if bucket["text"] else None
+
             if startup is None:
                 startup = Startup(
                     name=bucket["name"][:200],
                     slug=slug,
                     website=website,
-                    industry="Other technology startups",
+                    industry=inferred or "Other technology startups",
                     hq_country="India",
                     discovery_source="ingestion_reconciliation",
                     verification_status="unverified",
@@ -86,8 +95,13 @@ async def main() -> None:
                 session.add(startup)
                 await session.flush()
                 created += 1
-            elif website and not startup.website:
-                startup.website = website
+            else:
+                if website and not startup.website:
+                    startup.website = website
+                if inferred and startup.industry == "Other technology startups":
+                    startup.industry = inferred
+                if startup.hiring_status == "unknown" and bucket["jobs"]:
+                    startup.hiring_status = "hiring"
 
             await session.execute(
                 update(JobListing)

@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, PaginationDep
@@ -99,9 +99,9 @@ async def upload_resume(
         path.mkdir(parents=True, exist_ok=True)
         target = path / f"{user.id}{suffix}"
         target.write_bytes(content)
-        profile.resume_url = f"/api/v1/me/profile/resume/file"
+        profile.resume_url = "/api/v1/me/profile/resume/file"
         profile.resume_filename = filename
-        profile.resume_uploaded_at = datetime.now(timezone.utc)
+        profile.resume_uploaded_at = datetime.now(UTC)
     except OSError as exc:
         log.warning("resume_save_failed", error=str(exc))
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Could not store the resume") from exc
@@ -351,7 +351,7 @@ async def create_application(
         job_id=payload.job_id,
         status=payload.status,
         notes=payload.notes,
-        applied_at=datetime.now(timezone.utc),
+        applied_at=datetime.now(UTC),
     )
     db.add(application)
     await db.commit()
@@ -434,6 +434,9 @@ async def recommendations(user: CurrentUser, db: DbSession, limit: int = Query(1
     for job in jobs:
         payload = _job_to_summary(job, skill_map.get(job.id, []), [job.category] if job.category else [])
         match = score_job_dict(profile, payload.model_dump())
+        # Only surface roles that share something meaningful with the profile.
+        if not match["matched_skills"] and match["score"] < 30:
+            continue
         scored.append((match, payload))
 
     scored.sort(key=lambda item: item[0]["score"], reverse=True)

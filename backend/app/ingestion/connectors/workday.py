@@ -8,7 +8,7 @@ JSON body; each posting's detail is available at the same path plus the
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core.logging import get_logger
@@ -28,7 +28,7 @@ def _parse_posted_on(value: str | None) -> datetime | None:
         return None
     amount = int(match.group(1))
     unit = match.group(2).lower()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if unit == "hour":
         return now.replace(minute=max(now.minute - amount, 0))
     if unit == "minute":

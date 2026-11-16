@@ -6,7 +6,7 @@ original posting URL on the record.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.logging import get_logger
@@ -22,7 +22,7 @@ def _parse_ts(value: Any) -> datetime | None:
         return None
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+            return datetime.fromtimestamp(float(value), tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
     text = str(value).strip()
@@ -40,7 +40,7 @@ def _parse_ts(value: Any) -> datetime | None:
                 continue
         else:
             return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 class GreenhouseConnector(Connector):

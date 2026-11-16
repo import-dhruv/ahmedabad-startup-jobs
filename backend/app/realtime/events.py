@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.logging import get_logger
@@ -14,7 +14,7 @@ log = get_logger(__name__)
 
 def _serialize(payload: dict[str, Any]) -> str:
     payload = dict(payload)
-    payload.setdefault("ts", datetime.now(timezone.utc).isoformat())
+    payload.setdefault("ts", datetime.now(UTC).isoformat())
     return json.dumps(payload, default=str)
 
 
@@ -64,7 +64,7 @@ class EventBroker:
                 try:
                     message = await asyncio.wait_for(queue.get(), timeout=heartbeat)
                     yield f"data: {message}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     yield ": ping\n\n"
         except asyncio.CancelledError:  # pragma: no cover - client disconnect
             raise

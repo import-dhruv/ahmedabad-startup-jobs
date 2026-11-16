@@ -8,7 +8,6 @@ from sqlalchemy import func, select
 
 from app.api.deps import DbSession
 from app.models import JobListing, JobSource
-from app.models.enums import JobStatus
 from app.schemas import SourceRead
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -23,13 +22,6 @@ async def list_sources(
     if active_only:
         stmt = stmt.where(JobSource.is_active.is_(True))
     sources = (await db.execute(stmt)).scalars().all()
-
-    counts_stmt = (
-        select(JobListing.source_id, func.count(JobListing.id))
-        .where(JobListing.status == JobStatus.ACTIVE)
-        .group_by(JobListing.source_id)
-    )
-    counts = {row[0]: row[1] for row in (await db.execute(counts_stmt)).all()}
 
     out = []
     for source in sources:

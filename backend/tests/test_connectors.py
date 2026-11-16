@@ -5,8 +5,6 @@ connectors read. They let us test parsing without hitting the network.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
 from app.ingestion.base import ConnectorContext
@@ -362,7 +360,8 @@ CAREER_PAGE_HTML = """
     "@type": "Place",
     "address": {"@type": "PostalAddress", "addressLocality": "Ahmedabad", "addressCountry": "IN"}
   },
-  "baseSalary": {"@type": "MonetaryAmount", "currency": "INR", "value": {"@type": "QuantitativeValue", "minValue": 1800000, "maxValue": 2400000}},
+  "baseSalary": {"@type": "MonetaryAmount", "currency": "INR",
+    "value": {"@type": "QuantitativeValue", "minValue": 1800000, "maxValue": 2400000}},
   "url": "https://example.com/jobs/founding-engineer"
 }
 </script>

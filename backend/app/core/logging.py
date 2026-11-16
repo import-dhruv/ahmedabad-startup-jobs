@@ -15,7 +15,9 @@ structlog.configure(
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-        structlog.dev.ConsoleRenderer(colors=True) if not settings.is_production else structlog.processors.JSONRenderer(),
+        structlog.dev.ConsoleRenderer(colors=True)
+    if not settings.is_production
+    else structlog.processors.JSONRenderer(),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     logger_factory=structlog.PrintLoggerFactory(),

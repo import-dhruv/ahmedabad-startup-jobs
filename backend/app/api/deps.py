@@ -4,9 +4,8 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, Query, status
+from fastapi import Cookie, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_token

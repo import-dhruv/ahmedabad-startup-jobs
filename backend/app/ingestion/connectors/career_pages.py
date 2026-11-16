@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -102,7 +102,7 @@ def _parse_date(value: Any) -> datetime | None:
         dt = datetime.fromisoformat(text)
     except ValueError:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _location_text(posting: dict) -> str | None:

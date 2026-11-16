@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import get_logger
-from app.ingestion.base import Connector, RawJob
+from app.ingestion.base import RawJob
 from app.models import (
     IngestionError,
     IngestionRun,
@@ -28,7 +29,6 @@ from app.services import dedup as dedup_service
 from app.services.normalizer import (
     canonical_employment_type,
     content_hash,
-    detect_industry,
     normalize_job_fields,
     taxonomy,
 )
@@ -155,7 +155,7 @@ class JobIngestionPipeline:
             self.stats.duplicates += 1
             return "duplicate"
 
-        created = await self._create_job(raw, job, source, resolved_startup_id)
+        await self._create_job(raw, job, source, resolved_startup_id)
         self.stats.created += 1
         return "created"
 
@@ -182,7 +182,7 @@ class JobIngestionPipeline:
 
     async def _find_duplicate(self, raw: RawJob, job: Any) -> JobListing | None:
         """Look for an existing posting from a *different* source that is the same role."""
-        cutoff = datetime.now(timezone.utc) - timedelta(days=120)
+        cutoff = datetime.now(UTC) - timedelta(days=120)
         dedup_key = dedup_service.fingerprint(raw.company_name, raw.title, raw.location_raw)
 
         seen: set[uuid.UUID] = set()
@@ -248,7 +248,7 @@ class JobIngestionPipeline:
         source: JobSource | None,
         startup_id: uuid.UUID | None,
     ) -> JobListing:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         slug = await self._unique_slug(raw.title, raw.company_name)
         location = job.location
         record = JobListing(
@@ -304,7 +304,7 @@ class JobIngestionPipeline:
         return record
 
     async def _update_existing(self, record: JobListing, raw: RawJob, job: Any) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         new_hash = content_hash(job.description, job.title, raw.apply_url)
         changed = record.content_hash != new_hash
         record.description = job.description or record.description
@@ -356,7 +356,7 @@ class JobIngestionPipeline:
             JobSourceReference.external_id == raw.external_id,
         )
         existing = (await self.session.execute(stmt)).scalars().first()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if existing:
             existing.last_seen_at = now
             existing.source_url = raw.original_url or raw.apply_url
@@ -488,7 +488,7 @@ async def start_run(
         source_id=source.id if source else None,
         status=RunStatus.RUNNING,
         trigger=trigger,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
     session.add(run)
     await session.commit()
@@ -505,7 +505,7 @@ async def finish_run(
     error: Exception | None = None,
 ) -> None:
     run.status = status
-    run.finished_at = datetime.now(timezone.utc)
+    run.finished_at = datetime.now(UTC)
     run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000) if run.started_at else None
     run.jobs_found = stats.found
     run.jobs_created = stats.created
@@ -536,7 +536,7 @@ async def mark_missing_jobs_stale(
 ) -> int:
     """Mark jobs from this source that were not seen in the latest run as stale/expired."""
     grace = grace_days if grace_days is not None else settings.job_stale_after_days
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(days=grace)
     stmt = select(JobListing).where(
         JobListing.source_id == source.id,
@@ -587,7 +587,7 @@ async def record_source_health(
     health.total_runs += 1
     if success:
         health.consecutive_failures = 0
-        health.last_success_at = datetime.now(timezone.utc)
+        health.last_success_at = datetime.now(UTC)
         health.last_error = None
         health.jobs_last_run = jobs_found
         source.last_success_at = health.last_success_at
@@ -595,7 +595,7 @@ async def record_source_health(
     else:
         health.consecutive_failures += 1
         health.total_failures += 1
-        health.last_failure_at = datetime.now(timezone.utc)
+        health.last_failure_at = datetime.now(UTC)
         health.last_error = (error or "")[:2000]
         source.consecutive_failures += 1
     health.avg_duration_ms = (health.avg_duration_ms * (health.total_runs - 1) + duration_ms) / max(
@@ -608,6 +608,6 @@ async def record_source_health(
         health.status = SourceStatus.DEGRADED
     else:
         health.status = SourceStatus.HEALTHY
-    source.last_run_at = datetime.now(timezone.utc)
+    source.last_run_at = datetime.now(UTC)
     source.total_jobs_discovered += jobs_found
     await session.commit()

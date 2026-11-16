@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select
@@ -15,7 +15,7 @@ from app.ingestion.pipeline import (
     record_source_health,
 )
 from app.models import JobListing, JobSource, JobSourceReference
-from app.models.enums import JobStatus, VerificationStatus
+from app.models.enums import VerificationStatus
 
 
 def _raw(
@@ -38,7 +38,7 @@ def _raw(
         original_url=apply_url,
         description=description,
         location_raw=location,
-        posted_at=datetime.now(timezone.utc),
+        posted_at=datetime.now(UTC),
     )
 
 
@@ -149,7 +149,7 @@ async def test_missing_jobs_are_marked_stale(db):
     await db.commit()
 
     job = (await db.execute(select(JobListing))).scalar_one()
-    job.last_verified_at = datetime.now(timezone.utc) - timedelta(days=30)
+    job.last_verified_at = datetime.now(UTC) - timedelta(days=30)
     await db.commit()
 
     stale = await mark_missing_jobs_stale(db, source, set(), grace_days=14)
@@ -175,7 +175,7 @@ async def test_jobs_seen_in_the_current_run_are_not_marked_stale(db):
     await db.commit()
 
     job = (await db.execute(select(JobListing))).scalar_one()
-    job.last_verified_at = datetime.now(timezone.utc) - timedelta(days=30)
+    job.last_verified_at = datetime.now(UTC) - timedelta(days=30)
     await db.commit()
 
     stale = await mark_missing_jobs_stale(db, source, {raw.external_id}, grace_days=14)

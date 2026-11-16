@@ -5,11 +5,10 @@ a separate module and is clearly labelled as interpretation.
 """
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Date, Float, and_, case, cast, func, or_, select
+from sqlalchemy import Date, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -26,7 +25,7 @@ ACTIVE_SCOPES = ("ahmedabad", "gujarat", "india_remote", "india", "global")
 
 
 async def dashboard_stats(db: AsyncSession) -> dict[str, Any]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     day_ago = now - timedelta(hours=24)
     week_ago = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
@@ -159,7 +158,7 @@ async def _await(db: AsyncSession, stmt: Any) -> Any:
 
 
 async def daily_postings(db: AsyncSession, days: int = 30) -> list[dict[str, Any]]:
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     stmt = (
         select(
             cast(func.coalesce(JobListing.posted_at, JobListing.discovered_at), Date).label("day"),
@@ -177,7 +176,7 @@ async def daily_postings(db: AsyncSession, days: int = 30) -> list[dict[str, Any
 
 async def skill_demand(db: AsyncSession, days: int = 60, limit: int = 25) -> list[dict[str, Any]]:
     """Most demanded skills with a measured week-over-week trend."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     recent_cut = now - timedelta(days=days)
     prev_cut = now - timedelta(days=days * 2)
 

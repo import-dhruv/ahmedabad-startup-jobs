@@ -8,17 +8,16 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import DbSession, PaginationDep
-from app.models import JobListing, Startup, StartupFounder, StartupFunding
+from app.api.deps import DbSession
+from app.api.v1.jobs import _job_to_summary
+from app.models import JobListing, Startup
 from app.models.enums import JobStatus
 from app.schemas import (
     FounderRead,
     FundingRead,
-    JobSummary,
     StartupDetail,
     StartupRead,
 )
-from app.api.v1.jobs import _job_to_summary
 
 router = APIRouter(prefix="/startups", tags=["startups"])
 
@@ -113,7 +112,11 @@ async def search_startups(
 
 @router.get("/filters", summary="Startup filter options")
 async def startup_filters(db: DbSession) -> dict[str, Any]:
-    industry_rows = (await db.execute(select(Startup.industry, func.count(Startup.id)).group_by(Startup.industry))).all()
+    industry_rows = (
+        await db.execute(
+            select(Startup.industry, func.count(Startup.id)).group_by(Startup.industry)
+        )
+    ).all()
     stage_rows = (
         await db.execute(
             select(Startup.funding_stage, func.count(Startup.id))

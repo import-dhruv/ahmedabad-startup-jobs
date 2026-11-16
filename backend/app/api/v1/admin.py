@@ -4,12 +4,11 @@ from __future__ import annotations
 import csv
 import io
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select, text, update
 
 from app.api.deps import AdminUser, DbSession
 from app.core.logging import get_logger
@@ -19,7 +18,6 @@ from app.models import (
     IngestionRun,
     JobListing,
     JobSource,
-    Skill,
     Startup,
     StartupFounder,
     StartupFunding,
@@ -29,6 +27,7 @@ from app.schemas import (
     AdminOverview,
     ErrorRead,
     HealthRead,
+    ImportRequest,
     ImportResult,
     JobAdminUpdate,
     MergeCompaniesRequest,
@@ -47,7 +46,7 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[])
 
 @router.get("/overview", response_model=AdminOverview)
 async def overview(db: DbSession, _: AdminUser) -> AdminOverview:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     day_ago = now - timedelta(hours=24)
 
     total_sources = (await db.execute(select(func.count(JobSource.id)))).scalar_one()
@@ -112,7 +111,11 @@ async def overview(db: DbSession, _: AdminUser) -> AdminOverview:
 
     db_size_mb: float | None = None
     try:
-        size_bytes = (await db.execute(select(func.pg_database_size(current_database())))).scalar_one()
+        size_bytes = (
+            await db.execute(
+                text("SELECT pg_database_size(current_database())")
+            )
+        ).scalar_one()
         db_size_mb = round(size_bytes / (1024 * 1024), 2)
     except Exception:
         db_size_mb = None
@@ -356,7 +359,7 @@ async def verify_job(job_id: uuid.UUID, db: DbSession, _: AdminUser) -> dict[str
             alive = False
             log.info("verify_failed", job_id=str(job_id), error=str(exc))
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job.last_verified_at = now
     if alive:
         job.verification_status = VerificationStatus.VERIFIED
@@ -500,7 +503,7 @@ async def verify_startup(startup_id: uuid.UUID, db: DbSession, _: AdminUser) -> 
             alive = resp.status_code < 400
         except Exception as exc:
             evidence["error"] = str(exc)
-    evidence["checked_at"] = datetime.now(timezone.utc).isoformat()
+    evidence["checked_at"] = datetime.now(UTC).isoformat()
 
     verification = (
         await db.execute(select(CompanyVerification).where(CompanyVerification.startup_id == startup.id))
@@ -510,7 +513,7 @@ async def verify_startup(startup_id: uuid.UUID, db: DbSession, _: AdminUser) -> 
         db.add(verification)
     verification.status = VerificationStatus.VERIFIED if alive else VerificationStatus.STALE
     verification.evidence = evidence
-    verification.verified_at = datetime.now(timezone.utc)
+    verification.verified_at = datetime.now(UTC)
 
     startup.verification_status = verification.status
     startup.last_verified_at = verification.verified_at

@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -30,7 +30,7 @@ def verify_password(plain: str, hashed: str | None) -> bool:
 
 
 def _create_token(subject: str, expires_delta: timedelta, token_type: str, claims: dict | None = None) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": subject,
         "iat": int(now.timestamp()),

@@ -1,8 +1,7 @@
 """Job-alert matching and email notification delivery."""
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -12,7 +11,6 @@ from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.models import JobAlert, JobListing, Notification, User
 from app.models.enums import JobStatus, NotificationType
-from app.services.normalizer import normalize_title
 
 log = get_logger(__name__)
 
@@ -56,7 +54,7 @@ def _matches(alert: JobAlert, job: JobListing) -> bool:
 
 async def dispatch_alerts() -> dict[str, Any]:
     """Create notifications for alerts matching recently discovered jobs."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     since = now - timedelta(hours=2)
     created = 0
     emailed = 0
@@ -122,8 +120,9 @@ async def send_email(to: str, subject: str, body: str) -> bool:
         log.info("email_skipped", to=to, subject=subject)
         return False
     try:
-        import aiosmtplib
         from email.message import EmailMessage
+
+        import aiosmtplib
 
         message = EmailMessage()
         message["From"] = settings.email_from

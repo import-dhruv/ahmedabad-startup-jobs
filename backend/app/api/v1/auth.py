@@ -1,13 +1,11 @@
 """Authentication: email/password, JWT and Google OAuth."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Annotated
+from datetime import UTC, datetime
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
@@ -86,7 +84,7 @@ async def login(payload: UserLogin, response: Response, db: DbSession) -> TokenR
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been disabled")
 
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(user)
 
@@ -198,7 +196,7 @@ async def google_sign_in(
         user.google_id = info.get("sub") or user.google_id
         user.avatar_url = info.get("picture") or user.avatar_url
         user.is_verified = True
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(user)
 

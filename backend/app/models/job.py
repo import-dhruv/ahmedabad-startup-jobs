@@ -113,15 +113,15 @@ class JobListing(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     classification_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    startup: Mapped["Startup | None"] = relationship(back_populates="jobs", lazy="joined")  # noqa: F821
+    startup: Mapped[Startup | None] = relationship(back_populates="jobs", lazy="joined")  # noqa: F821
     source: Mapped[JobSource | None] = relationship(lazy="joined")
-    skill_links: Mapped[list["JobSkill"]] = relationship(  # noqa: F821
+    skill_links: Mapped[list[JobSkill]] = relationship(  # noqa: F821
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
-    category_links: Mapped[list["JobCategory"]] = relationship(  # noqa: F821
+    category_links: Mapped[list[JobCategory]] = relationship(  # noqa: F821
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
-    references: Mapped[list["JobSourceReference"]] = relationship(  # noqa: F821
+    references: Mapped[list[JobSourceReference]] = relationship(  # noqa: F821
         back_populates="job", cascade="all, delete-orphan", lazy="selectin"
     )
 

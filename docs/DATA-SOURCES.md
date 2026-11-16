@@ -30,10 +30,10 @@ invents a salary, and never bypasses an access control.
 | Feed | Endpoint | `robots.txt` | Notes |
 |---|---|---|---|
 | RemoteOK | `remoteok.com/api` | `Allow: /` for generic agents (AI training bots excluded) | Public JSON feed; the legal-notice entry is skipped. |
-| Remotive | `remotive.com/api/remote-jobs` | Allows all except a few search/apply paths | Public JSON feed. |
 | Arbeitnow | `www.arbeitnow.com/api/job-board-api` | No restrictions | Public JSON feed. |
-| Jobicy | `jobicy.com/api/v2/remote-jobs` | Allows all except search-query paths | Public JSON feed. |
 | Himalayas | `himalayas.app/jobs/api` | `Allow: /` with pagination paths disallowed | Public JSON feed. |
+| Remotive | `remotive.com/api/remote-jobs` | **`Disallow: /api/*`** | **Not read.** The API path is disallowed, so the source is never registered and `scripts/enforce_robots_policy.py` keeps it deactivated. |
+| Jobicy | `jobicy.com/api/v2/remote-jobs` | **Disallows its API path** | **Not read**, for the same reason. |
 
 ### Founder-posted openings
 
@@ -53,6 +53,8 @@ invents a salary, and never bypasses an access control.
 |---|---|
 | LinkedIn | `robots.txt` and the User Agreement explicitly prohibit automated access. |
 | Internshala | `robots.txt` disallows crawling, including its job and internship paths. |
+| Remotive | `robots.txt` contains `Disallow: /api/*`, which covers its public JSON feed. |
+| Jobicy | `robots.txt` disallows its API path. |
 | Naukri, Cutshort, Instahyre | No public API that permits automated access; their terms require a commercial agreement. |
 | Google Jobs / Indeed | No public API; scraping would violate their terms. |
 | The YC company directory API | `api.ycombinator.com/robots.txt` disallows crawling. The connector exists but is opt-in and off by default — the platform does not bypass the restriction. |
@@ -60,6 +62,19 @@ invents a salary, and never bypasses an access control.
 If you hold a licence or partnership with any of these, add the source through the admin API and
 the rest of the pipeline — normalisation, de-duplication, verification and publication — works
 unchanged.
+
+### Auditing
+
+`scripts/enforce_robots_policy.py` re-checks every registered source against its host's
+`robots.txt`. Where access is not permitted it deactivates the source, records why in the source
+notes, and removes listings that exist only because of that source (listings also present on a
+permitted source keep their data and references).
+
+Run it after adding sources and on a schedule:
+
+```bash
+docker compose exec api python -m scripts.enforce_robots_policy
+```
 
 ## Attributing a source
 

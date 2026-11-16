@@ -56,13 +56,13 @@ class Startup(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    founders: Mapped[list["StartupFounder"]] = relationship(
+    founders: Mapped[list[StartupFounder]] = relationship(
         back_populates="startup", cascade="all, delete-orphan", lazy="selectin"
     )
-    funding_rounds: Mapped[list["StartupFunding"]] = relationship(
+    funding_rounds: Mapped[list[StartupFunding]] = relationship(
         back_populates="startup", cascade="all, delete-orphan", lazy="selectin"
     )
-    jobs: Mapped[list["JobListing"]] = relationship(  # noqa: F821
+    jobs: Mapped[list[JobListing]] = relationship(  # noqa: F821
         back_populates="startup", lazy="noload"
     )
 

@@ -140,7 +140,12 @@ def compare(
 
     if title_match and loc_match and desc_sim >= 0.35:
         confidence = 0.7 + 0.25 * desc_sim
-        return DuplicateVerdict(True, min(confidence, 0.97), "same company, title, location and description", "title+location+description")
+        return DuplicateVerdict(
+            True,
+            min(confidence, 0.97),
+            "same company, title, location and description",
+            "title+location+description",
+        )
 
     # 3. Same company and near-identical description (re-titled posting).
     if desc_sim >= 0.85 and loc_match:

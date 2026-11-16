@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from celery import shared_task
@@ -24,13 +24,9 @@ from app.ingestion.pipeline import (
 )
 from app.ingestion.registry import build_connector
 from app.models import (
-    IngestionRun,
     JobListing,
     JobSource,
-    JobSourceReference,
-    Skill,
     Startup,
-    StartupFounder,
 )
 from app.models.enums import JobStatus, RunStatus, VerificationStatus
 from app.realtime.events import broker
@@ -114,7 +110,7 @@ def run_due_sources() -> dict[str, Any]:
 
     async def _run() -> dict[str, Any]:
         async with SessionLocal() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             sources = (await session.execute(select(JobSource).where(JobSource.is_active.is_(True)))).scalars().all()
             due = [
                 s
@@ -139,9 +135,8 @@ def discover_companies() -> dict[str, Any]:
 
     async def _run() -> dict[str, Any]:
         from app.ingestion.discovery import (
-            detect_ats_slugs_from_pages,
             discover_from_yc,
-            probe_ats_boards,
+            probe_domains_for_boards,
             workday_config,
         )
 
@@ -194,7 +189,15 @@ def discover_companies() -> dict[str, Any]:
                 sources_created = 0
                 for domain, hits in boards.items():
                     for hit in hits:
-                        source_slug = f"{hit['kind']}-{hit['slug']}"
+                        if hit["kind"] == "workday":
+                            config = workday_config(hit["slug"])
+                            source_slug = f"workday-{hit['slug'].split('|')[0]}"
+                        else:
+                            config = {"connector_type": hit["kind"]}
+                            if hit["kind"] == "greenhouse":
+                                config["board_token"] = hit["slug"]
+                            else:
+                                config["company"] = hit["slug"]
                         exists = (
                             await session.execute(select(JobSource).where(JobSource.slug == source_slug))
                         ).scalar_one_or_none()
@@ -205,15 +208,6 @@ def discover_companies() -> dict[str, Any]:
                                 select(Startup).where(Startup.website.like(f"%{domain}%"))
                             )
                         ).scalars().first()
-                        if hit["kind"] == "workday":
-                            config = workday_config(hit["slug"])
-                            source_slug = f"workday-{hit['slug'].split('|')[0]}"
-                        else:
-                            config = {"connector_type": hit["kind"]}
-                            if hit["kind"] == "greenhouse":
-                                config["board_token"] = hit["slug"]
-                            else:
-                                config["company"] = hit["slug"]
                         source = JobSource(
                             name=f"{hit['kind'].title()} · {hit['slug'].split('|')[0]}",
                             slug=source_slug,
@@ -245,7 +239,7 @@ def verify_job_links() -> dict[str, Any]:
     async def _run() -> dict[str, Any]:
         from app.ingestion.http_client import PoliteClient
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=2)
+        cutoff = datetime.now(UTC) - timedelta(days=2)
         async with SessionLocal() as session:
             stmt = (
                 select(JobListing)
@@ -264,12 +258,10 @@ def verify_job_links() -> dict[str, Any]:
                     try:
                         resp = await client.head(job.apply_url, allow_robots_check=False)
                         alive = resp.status_code < 400
-                        status_code = resp.status_code
                     except Exception:
                         alive = False
-                        status_code = None
                     checked += 1
-                    job.last_verified_at = datetime.now(timezone.utc)
+                    job.last_verified_at = datetime.now(UTC)
                     if alive:
                         job.verification_status = VerificationStatus.VERIFIED
                     else:
@@ -286,7 +278,7 @@ def reconcile_job_status() -> dict[str, Any]:
     """Mark listings that have not been seen recently as stale or expired."""
 
     async def _run() -> dict[str, Any]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         stale_cut = now - timedelta(days=settings.job_stale_after_days)
         expire_cut = now - timedelta(days=settings.job_expire_after_days)
         async with SessionLocal() as session:
@@ -324,7 +316,7 @@ def enrich_jobs_with_ai() -> dict[str, Any]:
         from app.services.ai import get_effective_provider
 
         provider = get_effective_provider()
-        cutoff = datetime.now(timezone.utc) - timedelta(days=3)
+        cutoff = datetime.now(UTC) - timedelta(days=3)
         async with SessionLocal() as session:
             stmt = (
                 select(JobListing)
@@ -369,7 +361,7 @@ def refresh_source_health() -> dict[str, Any]:
                 ).scalar_one_or_none()
                 if health is None:
                     continue
-                recent_cut = datetime.now(timezone.utc) - timedelta(hours=24)
+                recent_cut = datetime.now(UTC) - timedelta(hours=24)
                 count = (
                     await session.execute(
                         select(func.count(JobListing.id)).where(

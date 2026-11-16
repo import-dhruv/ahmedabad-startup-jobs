@@ -6,6 +6,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urlparse, urlsplit
 
 import httpx
@@ -168,7 +169,7 @@ class PoliteClient:
         self._hosts: dict[str, _HostState] = defaultdict(_HostState)
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "PoliteClient":
+    async def __aenter__(self) -> PoliteClient:
         await self.start()
         return self
 
