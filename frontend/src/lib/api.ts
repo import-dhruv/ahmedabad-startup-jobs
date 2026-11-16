@@ -1,4 +1,30 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/$/, "");
+/**
+ * The browser talks to a same-origin `/api/v1` path, which Next.js proxies to
+ * the API server (see `API_PROXY_TARGET` in next.config.ts). That keeps the
+ * backend location a runtime setting instead of a build-time constant, and
+ * avoids cross-origin requests in the browser.
+ *
+ * Set `NEXT_PUBLIC_API_URL` to call the API directly instead — useful when
+ * the API is on a different origin and CORS is configured.
+ */
+export const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL?.trim() || "/api/v1"
+).replace(/\/$/, "");
+
+/**
+ * Absolute base URL for server-side rendering, where a relative path has no
+ * meaning. Falls back to the local API during development.
+ */
+export const API_SERVER_URL = (
+  process.env.API_PROXY_TARGET?.trim()
+    ? `${process.env.API_PROXY_TARGET.trim().replace(/\/$/, "")}/api/v1`
+    : process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:8000/api/v1"
+).replace(/\/$/, "");
+
+/** Browser requests are same-origin (proxied); server requests need an absolute URL. */
+function resolveBase(): string {
+  return typeof window === "undefined" ? API_SERVER_URL : API_URL;
+}
 
 export interface ApiError {
   status: number;
@@ -26,7 +52,7 @@ async function request<T>(path: string, init?: RequestInit & { token?: string | 
     headers.set("Authorization", `Bearer ${init.token}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${resolveBase()}${path}`, {
     ...init,
     headers,
     cache: "no-store",
@@ -57,7 +83,7 @@ export const api = {
   postForm: async <T>(path: string, form: FormData, token?: string | null): Promise<T> => {
     const headers = new Headers();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    const res = await fetch(`${API_URL}${path}`, { method: "POST", body: form, headers });
+    const res = await fetch(`${resolveBase()}${path}`, { method: "POST", body: form, headers });
     if (!res.ok) throw new ApiRequestError(res.status, `Upload failed (${res.status})`);
     return (await res.json()) as T;
   },

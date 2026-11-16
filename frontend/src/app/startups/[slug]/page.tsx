@@ -7,14 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/job-card";
-import { API_URL, type StartupDetail } from "@/lib/api";
+import { API_SERVER_URL, type StartupDetail } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 
 export const revalidate = 300;
 
 async function fetchStartup(slug: string): Promise<StartupDetail | null> {
   try {
-    const res = await fetch(`${API_URL}/startups/slug/${slug}`, {
+    const res = await fetch(`${API_SERVER_URL}/startups/slug/${slug}`, {
       next: { revalidate: 300 },
       headers: { Accept: "application/json" },
     });

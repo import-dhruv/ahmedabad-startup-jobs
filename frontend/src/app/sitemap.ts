@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { API_URL } from "@/lib/api";
+import { API_SERVER_URL } from "@/lib/api";
 
 export const revalidate = 3600;
 
@@ -58,7 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   try {
-    const jobsRes = await fetch(`${API_URL}/jobs?per_page=100&page=1`, {
+    const jobsRes = await fetch(`${API_SERVER_URL}/jobs?per_page=100&page=1`, {
       next: { revalidate: 3600 },
       headers: { Accept: "application/json" },
     });
@@ -78,7 +78,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    const startupsRes = await fetch(`${API_URL}/startups?limit=100`, {
+    const startupsRes = await fetch(`${API_SERVER_URL}/startups?limit=100`, {
       next: { revalidate: 3600 },
       headers: { Accept: "application/json" },
     });

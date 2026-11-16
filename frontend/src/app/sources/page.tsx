@@ -4,7 +4,7 @@ import { Database, ExternalLink, Radio } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { API_URL } from "@/lib/api";
+import { API_SERVER_URL } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export default async function SourcesPage() {
   let sources: SourceStat[] = [];
   let totalJobs = 0;
   try {
-    const res = await fetch(`${API_URL}/sources/stats`, {
+    const res = await fetch(`${API_SERVER_URL}/sources/stats`, {
       next: { revalidate: 120 },
       headers: { Accept: "application/json" },
     });

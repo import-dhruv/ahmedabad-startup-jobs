@@ -4,7 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { Providers } from "@/components/providers";
-import { API_URL } from "@/lib/api";
+import { API_SERVER_URL } from "@/lib/api";
 
 import "./globals.css";
 
@@ -94,7 +94,7 @@ export const dynamicParams = true;
 
 export async function fetchFromApi<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(`${API_SERVER_URL}${path}`, {
       ...init,
       next: { revalidate: 300 },
       headers: { Accept: "application/json" },

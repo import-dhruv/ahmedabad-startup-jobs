@@ -4,7 +4,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { API_URL } from "@/lib/api";
+import { API_SERVER_URL } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Industries",
@@ -17,7 +17,7 @@ export const revalidate = 300;
 
 async function fetchIndustries() {
   try {
-    const res = await fetch(`${API_URL}/stats/industries`, {
+    const res = await fetch(`${API_SERVER_URL}/stats/industries`, {
       next: { revalidate: 300 },
       headers: { Accept: "application/json" },
     });

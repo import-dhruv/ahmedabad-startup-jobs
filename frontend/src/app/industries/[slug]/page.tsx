@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { IndustryLanding } from "@/components/industry-landing";
-import { API_URL } from "@/lib/api";
+import { API_SERVER_URL } from "@/lib/api";
 
 export const revalidate = 300;
 
 async function fetchIndustry(slug: string) {
   try {
-    const res = await fetch(`${API_URL}/jobs?industry=${encodeURIComponent(slug)}&per_page=25`, {
+    const res = await fetch(`${API_SERVER_URL}/jobs?industry=${encodeURIComponent(slug)}&per_page=25`, {
       next: { revalidate: 300 },
       headers: { Accept: "application/json" },
     });

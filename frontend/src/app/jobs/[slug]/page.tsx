@@ -17,14 +17,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { VerificationBadge } from "@/components/job-card";
 import { SaveJobButton } from "@/components/save-job-button";
-import { API_URL, type JobDetail } from "@/lib/api";
+import { API_SERVER_URL, type JobDetail } from "@/lib/api";
 import { formatCurrency, formatDate, GEO_SCOPE_LABEL, timeAgo } from "@/lib/utils";
 
 export const revalidate = 300;
 
 async function fetchJob(slug: string): Promise<JobDetail | null> {
   try {
-    const res = await fetch(`${API_URL}/jobs/slug/${slug}`, {
+    const res = await fetch(`${API_SERVER_URL}/jobs/slug/${slug}`, {
       next: { revalidate: 300 },
       headers: { Accept: "application/json" },
     });
