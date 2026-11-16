@@ -19,6 +19,20 @@ start_api() {
     > "$LOG_DIR/api.log" 2>&1 < /dev/null &
 }
 
+start_worker() {
+  cd "$ROOT" || exit 1
+  setsid nohup "$VENV/celery" -A app.workers.celery_app.celery_app worker \
+    --loglevel=info --concurrency=2 \
+    > "$LOG_DIR/worker.log" 2>&1 < /dev/null &
+}
+
+start_beat() {
+  cd "$ROOT" || exit 1
+  setsid nohup "$VENV/celery" -A app.workers.celery_app.celery_app beat \
+    --loglevel=info \
+    > "$LOG_DIR/beat.log" 2>&1 < /dev/null &
+}
+
 start_tunnel() {
   rm -f "$LOG_DIR/ngrok.log"
   setsid nohup ngrok http 8000 --log=stdout --log-format=json \
@@ -39,28 +53,34 @@ start_tunnel() {
 case "${1:-start}" in
   start)
     start_api
+    start_worker
+    start_beat
     sleep 6
     start_tunnel
     ;;
   restart)
-    for p in $(ps -eo pid,args | grep -E "uvicorn app.main|ngrok http 8000" | grep -v grep | awk '{print $1}'); do
+    for p in $(ps -eo pid,args | grep -E "uvicorn app.main|ngrok http 8000|celery -A" | grep -v grep | awk '{print $1}'); do
       kill "$p" 2>/dev/null
     done
     sleep 3
     start_api
+    start_worker
+    start_beat
     sleep 6
     start_tunnel
     ;;
   stop)
-    for p in $(ps -eo pid,args | grep -E "uvicorn app.main|ngrok http 8000" | grep -v grep | awk '{print $1}'); do
+    for p in $(ps -eo pid,args | grep -E "uvicorn app.main|ngrok http 8000|celery -A" | grep -v grep | awk '{print $1}'); do
       kill "$p" 2>/dev/null
     done
     echo "stopped"
     ;;
   status)
     url=$(cat "$URL_FILE" 2>/dev/null)
+    workers=$(ps -eo args | grep -c "[c]elery -A app.workers" || true)
     echo "api:    $(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health)"
     echo "tunnel: $(curl -s -o /dev/null -w '%{http_code}' "${url:-http://127.0.0.1:8000}/health")"
+    echo "celery: $workers process(es)"
     echo "url:    ${url:-none}"
     ;;
   *)
