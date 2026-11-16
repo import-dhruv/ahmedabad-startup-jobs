@@ -9,6 +9,8 @@ candidates can apply to.
 **Live at https://ahmedabad-startup-jobs.vercel.app** — 1,900+ real openings from 24 public job
 boards, refreshed every 15 minutes.
 
+**Source: https://github.com/import-dhruv/ahmedabad-startup-jobs**
+
 The platform continuously discovers companies and their job boards, ingests openings from public
 APIs and career pages, normalises and de-duplicates them, verifies that application links still
 resolve, and publishes the result with full source attribution.
