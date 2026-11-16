@@ -34,16 +34,29 @@ function notify() {
   listeners.forEach((listener) => listener());
 }
 
+// useSyncExternalStore requires getSnapshot to return the same value until the
+// store actually changes. Parse only when the raw localStorage value changes,
+// otherwise React sees a new object on every read and re-renders forever.
+let cachedRaw: string | null | undefined;
+let cachedSession: Session | null = null;
+
 function readSession(): Session | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Session;
-    return parsed?.token ? parsed : null;
-  } catch {
-    return null;
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    if (!raw) {
+      cachedSession = null;
+    } else {
+      try {
+        const parsed = JSON.parse(raw) as Session;
+        cachedSession = parsed?.token ? parsed : null;
+      } catch {
+        cachedSession = null;
+      }
+    }
   }
+  return cachedSession;
 }
 
 function subscribe(onChange: () => void) {
@@ -57,10 +70,14 @@ function subscribe(onChange: () => void) {
 
 function writeSession(session: Session | null) {
   if (session) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    const raw = JSON.stringify(session);
+    window.localStorage.setItem(STORAGE_KEY, raw);
+    cachedRaw = raw;
   } else {
     window.localStorage.removeItem(STORAGE_KEY);
+    cachedRaw = null;
   }
+  cachedSession = session;
   notify();
 }
 
