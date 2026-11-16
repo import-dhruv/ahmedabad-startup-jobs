@@ -6,6 +6,9 @@ A production-grade, real-time startup hiring intelligence platform for Ahmedabad
 GIFT City, Sanand and the wider Gujarat startup ecosystem — plus remote roles that Indian
 candidates can apply to.
 
+**Live at https://ahmedabad-startup-jobs.vercel.app** — 1,900+ real openings from 24 public job
+boards, refreshed every 15 minutes.
+
 The platform continuously discovers companies and their job boards, ingests openings from public
 APIs and career pages, normalises and de-duplicates them, verifies that application links still
 resolve, and publishes the result with full source attribution.
@@ -26,6 +29,7 @@ resolve, and publishes the result with full source attribution.
 | Admin | Source management, ingestion monitoring, source health, verification queue, company merge, CSV import |
 | AI layer | Skills extraction, job classification, summaries, hiring interpretation — optional, clearly labelled, works without an API key |
 | SEO | JobPosting + Organization structured data, per-job and per-company pages, sitemap, robots |
+| Deployment | Frontend live on Vercel; API, workers, PostgreSQL and Redis on this host behind a tunnel |
 
 ---
 
@@ -177,6 +181,7 @@ API, authentication and the admin surface.
 | [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md) | Every source, what it is, and its access terms |
 | [`docs/API.md`](docs/API.md) | Endpoint reference |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Production deployment, backups, scaling |
+| [`docs/VERCEL.md`](docs/VERCEL.md) | The live Vercel deployment, and how to move the whole stack onto Vercel |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Phased delivery plan and current status |
 
 ---

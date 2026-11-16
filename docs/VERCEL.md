@@ -1,58 +1,126 @@
 # Vercel deployment
 
-Vercel is excellent at the **frontend** and can host the **REST API** as a serverless
-function. It cannot run the **ingestion workers** — Celery workers and beat schedulers are
-long-lived processes, and Vercel functions are request-scoped and time-boxed.
+## Live deployment
 
-That matters for this product: without a worker, nothing discovers or refreshes jobs, and the
-board slowly goes stale. So there are three viable shapes, in descending order of how much
-runs on Vercel.
+| | |
+|---|---|
+| Production URL | **https://ahmedabad-startup-jobs.vercel.app** |
+| Vercel project | `dhruvs-projects-76a7424c/ahmedabad-startup-jobs` |
+| Project root directory | `frontend/` |
+| Backend | this host, behind an ngrok tunnel (`API_PROXY_TARGET`) |
+| Database | PostgreSQL 16 in Docker on this host |
+
+The browser talks to the Vercel domain; Next.js proxies `/api/*` to `API_PROXY_TARGET`
+(server-side, runtime setting). That keeps the backend location out of the build, so the tunnel
+URL can change without a rebuild.
+
+### Environment variables (project)
+
+| Variable | Type | Environments | Purpose |
+|---|---|---|---|
+| `API_PROXY_TARGET` | Secret | Production, Preview | Where the browser's `/api/*` requests are proxied |
+| `NEXT_PUBLIC_SITE_URL` | Config | Production, Preview | Canonical URLs and the sitemap |
+
+### Changing the backend URL
+
+```bash
+cd frontend
+vercel env rm API_PROXY_TARGET --environment production --yes
+vercel env add API_PROXY_TARGET --environment production --value "$NEW_URL" --sensitive --yes
+vercel deploy --prod --yes
+```
 
 ---
 
-## Option A — Vercel frontend + Vercel API + worker on a long-running host (recommended)
+## What Vercel can and cannot run here
 
-| Piece | Where | Why |
+| Piece | Vercel | Notes |
 |---|---|---|
-| Next.js frontend | Vercel | Native support, ISR, edge caching, preview deploys |
-| FastAPI REST API | Vercel (serverless function) | Stateless, scales to zero, fine for search/read |
-| Celery worker + beat | Railway / Fly.io / Render / any VPS | Long-running processes |
-| PostgreSQL | Neon / Supabase / Railway | Managed, pooled |
-| Redis | Upstash / Railway | Managed |
+| Next.js frontend | Yes | Native. ISR, edge caching, preview deployments |
+| FastAPI REST API | Yes | As a service on Fluid compute — but SSE is less reliable on time-boxed functions |
+| **Celery worker + beat** | **Yes — Vercel Daemons** | Public Beta on all plans. Built from a Dockerfile, declared under the `daemons` key in `vercel.json`. Cannot receive inbound traffic; pulls work from a queue. |
+| PostgreSQL | Marketplace | Neon via the Marketplace — installed from the dashboard |
+| Redis | Marketplace | Upstash via the Marketplace — installed from the dashboard |
 
-The frontend talks to the API at `NEXT_PUBLIC_API_URL`. The API talks to the same database and
-Redis.
+**Vercel Daemons change the picture.** They are long-running container processes intended
+exactly for Celery workers, so a full Vercel deployment is possible:
 
-**Caveat:** Server-Sent Events are unreliable on Vercel functions (they are bounded by the
-function's maximum duration). The live-update indicator will connect and then time out. If that
-matters, put the API on the long-running host too — see Option B.
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": { "root": "frontend/" },
+    "backend": { "root": "backend/", "entrypoint": "main:app" }
+  },
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ],
+  "daemons": {
+    "celery_worker": {
+      "root": "backend/",
+      "entrypoint": "Dockerfile",
+      "command": ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info"],
+      "instances": { "bom1": 1 }
+    },
+    "celery_beat": {
+      "root": "backend/",
+      "entrypoint": "Dockerfile",
+      "command": ["celery", "-A", "app.workers.celery_app.celery_app", "beat", "--loglevel=info"],
+      "instances": { "bom1": 1 }
+    }
+  }
+}
+```
 
-## Option B — Vercel frontend + the whole backend on a long-running host
+Constraints that shape this:
+
+- Daemons run on **production deployments only** during the beta — previews never start them.
+- A daemon **cannot receive inbound traffic**; only its own liveness probe reaches it. If you
+  configure `livenessProbe`, the worker process must serve that endpoint.
+- Instances are capped at **1–2 GiB on Hobby**, and Hobby also meters monthly Active CPU and
+  Provisioned Memory.
+- **A project whose root directory is a subfolder cannot declare daemons.** The current project
+  is rooted at `frontend/`, so a full-Vercel move requires re-rooting the project at the repo
+  root and using `services`.
+- Vercel sends `SIGTERM` on rollout and waits 30 s by default. Ingestion jobs are already
+  idempotent (SAVEPOINT per job, upserts by external id), so a restart mid-run is safe.
+
+## The three deployment shapes
+
+### A — Frontend on Vercel, backend on this host (current)
 
 | Piece | Where |
 |---|---|
 | Next.js frontend | Vercel |
-| FastAPI + Celery worker + Celery beat | Railway / Fly.io / Render / VPS (the existing Docker Compose) |
-| PostgreSQL + Redis | Managed or the same host |
+| FastAPI + Celery worker + Celery beat | this host (Docker Compose) |
+| PostgreSQL + Redis | this host (Docker Compose) |
 
-Everything in `docker-compose.yml` runs as-is on a Docker-capable host:
+SSE live updates, the 15-minute polling and the daily verification all behave normally. The
+trade-off is the tunnel: the ngrok free-tier URL is random, so it changes when the tunnel
+restarts and the Vercel env var must be updated and redeployed. A reserved ngrok domain, a
+Cloudflare named tunnel or a Tailscale Funnel hostname would fix that; all three need a free
+account.
 
-```bash
-docker compose up -d postgres redis
-docker compose run --rm api alembic upgrade head
-docker compose up -d api worker beat
-```
+### B — Everything on Vercel
 
-The frontend on Vercel then points `NEXT_PUBLIC_API_URL` at that host. SSE, the 15-minute
-polling and the daily verification all work normally.
+| Piece | Where |
+|---|---|
+| Next.js frontend | Vercel service |
+| FastAPI | Vercel service |
+| Celery worker + beat | Vercel daemons |
+| PostgreSQL + Redis | Marketplace (Neon, Upstash) |
 
-**This is the shape the repository is built and documented for.**
+Requires re-rooting the project at the repo root, installing two Marketplace integrations and
+moving the database. The result has no tunnel and no home-hosted dependency, but SSE through a
+Vercel service is still less reliable than through the local API, and the whole ingestion
+pipeline depends on Hobby-plan daemon quotas.
 
-## Option C — Everything on Vercel
+### C — Separate projects
 
-Only the frontend and the REST API run on Vercel, and the worker runs nowhere. The board keeps
-the listings it already has but never updates. Acceptable only as a demo; not acceptable for
-the product's promise of "always up to date".
+Frontend and backend as two independent Vercel projects. Useful when they need separate release
+cadences; the frontend reaches the backend through `NEXT_PUBLIC_API_URL` (public CORS) or a
+service binding (private).
 
 ---
 
@@ -60,64 +128,64 @@ the product's promise of "always up to date".
 
 ```bash
 cd frontend
-vercel link                 # or: vercel --prod --yes
-vercel env add NEXT_PUBLIC_API_URL production   # https://your-api-host/api/v1
-vercel --prod
+vercel link --yes --project ahmedabad-startup-jobs
+vercel env add API_PROXY_TARGET --environment production --value "$API" --sensitive --yes
+vercel env add NEXT_PUBLIC_SITE_URL --environment production --value "$SITE" --yes
+vercel deploy --prod --yes
 ```
 
-Environment variables:
+`scripts/deploy_vercel.sh` does the GitHub push, the link, the env vars and the deploy in one
+step.
 
-| Variable | Value | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://api.your-domain.com/api/v1` | Inlined at build time |
-| `NEXT_PUBLIC_SITE_URL` | `https://your-frontend-domain.com` | Used for canonical URLs and the sitemap |
+## Deploying the API as a Vercel service (Option B)
 
-## Deploying the API as a Vercel function (Options A and C)
-
-The repository ships `backend/api/index.py`, a thin ASGI entry point:
-
-```bash
-cd backend
-vercel --prod
-```
-
-Environment variables for the API project:
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://...` (Neon/Supabase) |
-| `SYNC_DATABASE_URL` | `postgresql+psycopg2://...` (for Alembic) |
-| `REDIS_URL` | `redis://...` (Upstash) |
-| `SECRET_KEY` | 32 random bytes |
-| `CORS_ORIGINS` | your Vercel domain |
-| `ENVIRONMENT` | `production` |
-
-Run migrations from a machine with network access to the database:
+`backend/api/index.py` is a thin ASGI entry point exporting the FastAPI `app`, and
+`backend/vercel.json` declares the `@vercel/python` build. The backend service must set
+`DATABASE_URL`, `SYNC_DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `CORS_ORIGINS` and
+`ENVIRONMENT`; migrations are applied from a machine with database access:
 
 ```bash
 alembic upgrade head
 ```
 
-## Adding the worker to Railway / Fly.io / Render
+## Verifying a protected deployment
 
-Point them at the `backend/Dockerfile` and run:
+If a deployment has Vercel Authentication enabled, use the CLI's authenticated client rather
+than disabling protection:
 
 ```bash
-celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=4
-celery -A app.workers.celery_app.celery_app beat --loglevel=info
+vercel curl https://ahmedabad-startup-jobs.vercel.app/api/v1/stats/dashboard
 ```
 
-Both need `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND`.
+For browser automation, attach the short-lived local token as a request header
+(`x-vercel-trusted-oidc-idp-token`) instead of disabling protection.
+
+---
+
+## Keeping this host's stack alive
+
+`scripts/serve.sh` starts and supervises the API and the tunnel on this host:
+
+```bash
+scripts/serve.sh start      # start the API and open a tunnel
+scripts/serve.sh status     # check both
+scripts/serve.sh restart    # restart after a tunnel URL change
+scripts/serve.sh stop
+```
+
+The current tunnel URL is written to `/tmp/ahsj-tunnel-url`.
 
 ---
 
 ## Checklist
 
-- [ ] `NEXT_PUBLIC_API_URL` set on the Vercel frontend project
-- [ ] `NEXT_PUBLIC_SITE_URL` set on the Vercel frontend project
-- [ ] CORS on the API allows the Vercel domain
-- [ ] Database migrations applied
-- [ ] A worker and a beat scheduler are running *somewhere*
+- [x] `NEXT_PUBLIC_API_URL` unset — the browser uses the same-origin `/api/v1` path
+- [x] `API_PROXY_TARGET` set for Production and Preview
+- [x] `NEXT_PUBLIC_SITE_URL` set for Production and Preview
+- [x] Database migrations applied
+- [x] Worker and beat scheduler running on this host
+- [x] `scripts/serve.sh status` reports a healthy API and tunnel
 - [ ] `scripts/enforce_robots_policy.py` scheduled daily
 - [ ] `scripts/seed.py` run once to populate the board
 - [ ] An administrator account created
+- [ ] The GitHub repository pushed
