@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 
 interface SkillRow {
   skill: string;

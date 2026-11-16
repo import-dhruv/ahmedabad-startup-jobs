@@ -6,6 +6,11 @@ import { authApi, type User } from "@/lib/api";
 
 const STORAGE_KEY = "ahsj-session";
 
+interface Session {
+  token: string;
+  user: User;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -18,69 +23,93 @@ interface AuthState {
 
 const AuthContext = React.createContext<AuthState | null>(null);
 
+/**
+ * The session lives in localStorage, so it is read through
+ * `useSyncExternalStore` instead of being copied into state inside an effect.
+ * The stored user is refreshed from the API in the background.
+ */
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((listener) => listener());
+}
+
+function readSession(): Session | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Session;
+    return parsed?.token ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function writeSession(session: Session | null) {
+  if (session) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  } else {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+  notify();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [token, setToken] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const session = React.useSyncExternalStore(subscribe, readSession, () => null);
+  const token = session?.token ?? null;
 
+  // Keep the stored user fresh. The session itself is never mirrored into
+  // state, so this only reconciles data, it does not drive rendering.
   React.useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as { token: string; user: User };
-      setToken(parsed.token);
-      setUser(parsed.user);
-      authApi
-        .me(parsed.token)
-        .then((fresh) => {
-          setUser(fresh);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: parsed.token, user: fresh }));
-        })
-        .catch(() => {
-          localStorage.removeItem(STORAGE_KEY);
-          setToken(null);
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-      setLoading(false);
-    }
-  }, []);
-
-  const persist = React.useCallback((nextToken: string, nextUser: User) => {
-    setToken(nextToken);
-    setUser(nextUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: nextToken, user: nextUser }));
-  }, []);
+    if (!token) return;
+    let cancelled = false;
+    authApi
+      .me(token)
+      .then((fresh) => {
+        if (cancelled) return;
+        const current = readSession();
+        if (current) writeSession({ token: current.token, user: fresh });
+      })
+      .catch(() => {
+        if (!cancelled) writeSession(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const value = React.useMemo<AuthState>(
     () => ({
-      user,
+      user: session?.user ?? null,
       token,
-      loading,
+      loading: false,
       async login(email, password) {
         const res = await authApi.login({ email, password });
-        persist(res.access_token, res.user);
+        writeSession({ token: res.access_token, user: res.user });
       },
       async register(email, password, fullName) {
         const res = await authApi.register({ email, password, full_name: fullName });
-        persist(res.access_token, res.user);
+        writeSession({ token: res.access_token, user: res.user });
       },
       async loginWithGoogle(idToken) {
         const res = await authApi.googleSignIn(idToken);
-        persist(res.access_token, res.user);
+        writeSession({ token: res.access_token, user: res.user });
       },
       logout() {
-        localStorage.removeItem(STORAGE_KEY);
-        setToken(null);
-        setUser(null);
+        writeSession(null);
       },
     }),
-    [user, token, loading, persist],
+    [session, token],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

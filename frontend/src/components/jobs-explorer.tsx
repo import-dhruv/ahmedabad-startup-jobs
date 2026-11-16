@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Filter, LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
+import { Filter, LayoutGrid, Search, SlidersHorizontal, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { MultiSelect, Select } from "@/components/ui/select";
 import { JobCard } from "@/components/job-card";
 import { JobCardSkeleton } from "@/components/ui/skeleton";
 import { jobsApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 const SCOPE_OPTIONS = [
   { value: "ahmedabad", label: "Ahmedabad" },
@@ -48,7 +47,7 @@ export function JobsExplorer() {
   const queryString = params.toString();
   const queryKey = ["jobs", queryString];
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey,
     queryFn: () => jobsApi.search(Object.fromEntries(params.entries())),
   });

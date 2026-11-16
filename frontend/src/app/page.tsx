@@ -19,15 +19,8 @@ import { LiveIndicator } from "@/components/live-indicator";
 import { SearchHero } from "@/components/search-hero";
 import { TrendChart } from "@/components/trend-chart";
 import { SkillCloud } from "@/components/skill-cloud";
-import {
-  type DashboardStats,
-  type JobSummary,
-  type StartupSummary,
-  jobsApi,
-  statsApi,
-  startupsApi,
-} from "@/lib/api";
-import { formatCompactNumber, timeAgo } from "@/lib/utils";
+import { jobsApi, statsApi, startupsApi } from "@/lib/api";
+import { formatCompactNumber } from "@/lib/utils";
 
 export const revalidate = 120;
 

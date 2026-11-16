@@ -25,7 +25,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobCard } from "@/components/job-card";
 import { useAuth } from "@/components/auth-provider";
-import { API_URL, jobsApi, userApi, type Profile } from "@/lib/api";
+import { API_URL, userApi, type Profile } from "@/lib/api";
 
 const EMPLOYMENT_OPTIONS = ["Full-time", "Internship", "Part-time", "Contract", "Freelance"];
 const ARRANGEMENT_OPTIONS = ["Remote", "Hybrid", "On-site"];

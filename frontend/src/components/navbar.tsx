@@ -19,10 +19,14 @@ const NAV = [
 
 export function Navbar() {
   const pathname = usePathname();
+  // Remounting on navigation resets the mobile menu, which avoids closing it
+  // from an effect (react-hooks/set-state-in-effect).
+  return <NavbarContent key={pathname} pathname={pathname} />;
+}
+
+function NavbarContent({ pathname }: { pathname: string }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
-
-  React.useEffect(() => setOpen(false), [pathname]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-border/70 glass">
