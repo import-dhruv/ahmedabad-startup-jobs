@@ -189,3 +189,13 @@ The current tunnel URL is written to `/tmp/ahsj-tunnel-url`.
 - [x] `scripts/seed.py` run once to populate the board
 - [x] An administrator account created (`admin@ahmedabadstartupjobs.com`)
 - [x] The GitHub repository pushed and connected to Vercel for auto-deploy
+
+### Note on the ngrok tunnel
+
+The free ngrok plan serves an HTML interstitial (with HTTP 200) to browsers
+that do not send the `ngrok-skip-browser-warning` header. The frontend sets
+that header on every `/api/*` request, including the fetch-based SSE stream,
+so the proxy always receives the real JSON response. Server-side rendering is
+unaffected because ngrok does not show the interstitial to non-browser
+clients. A paid ngrok plan or another tunnel without a browser warning would
+make the header unnecessary.
