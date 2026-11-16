@@ -14,6 +14,10 @@ interface LiveEvent {
 /**
  * Subscribes to the ingestion event stream and surfaces new-activity signals.
  * The counter is derived from real ingestion events pushed by the API.
+ *
+ * This uses fetch instead of EventSource because the tunnel needs an extra
+ * request header to avoid ngrok's browser interstitial, and EventSource
+ * cannot set custom headers.
  */
 export function LiveIndicator({ className }: { className?: string }) {
   const [connected, setConnected] = React.useState(false);
@@ -21,35 +25,65 @@ export function LiveIndicator({ className }: { className?: string }) {
   const [count, setCount] = React.useState(0);
 
   React.useEffect(() => {
-    let source: EventSource | null = null;
+    let controller: AbortController | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
 
-    const connect = () => {
+    const connect = async () => {
       if (closed) return;
-      source = new EventSource(`${API_URL}/events`);
-      source.onopen = () => setConnected(true);
-      source.onmessage = (message) => {
-        try {
-          const parsed = JSON.parse(message.data) as LiveEvent;
-          setLastEvent(parsed);
-          if (parsed.event === "jobs.discovered") {
-            setCount((current) => current + Number(parsed.data?.created ?? 0));
+      controller = new AbortController();
+      try {
+        const response = await fetch(`${API_URL}/events`, {
+          headers: {
+            Accept: "text/event-stream",
+            "ngrok-skip-browser-warning": "true",
+          },
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok || !response.body) throw new Error("stream unavailable");
+        setConnected(true);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (!closed) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split("\n\n");
+          buffer = frames.pop() ?? "";
+          for (const frame of frames) {
+            const data = frame
+              .split("\n")
+              .find((line) => line.startsWith("data:"))
+              ?.slice(5)
+              .trim();
+            if (!data) continue;
+            try {
+              const parsed = JSON.parse(data) as LiveEvent;
+              setLastEvent(parsed);
+              if (parsed.event === "jobs.discovered") {
+                setCount((current) => current + Number(parsed.data?.created ?? 0));
+              }
+            } catch {
+              /* ignore malformed frames */
+            }
           }
-        } catch {
-          /* ignore malformed frames */
         }
-      };
-      source.onerror = () => {
+      } catch {
+        /* reconnect below */
+      } finally {
         setConnected(false);
-        source?.close();
-        if (!closed) setTimeout(connect, 8000);
-      };
+        if (!closed) retry = setTimeout(() => void connect(), 8000);
+      }
     };
 
-    connect();
+    void connect();
     return () => {
       closed = true;
-      source?.close();
+      controller?.abort();
+      if (retry) clearTimeout(retry);
     };
   }, []);
 

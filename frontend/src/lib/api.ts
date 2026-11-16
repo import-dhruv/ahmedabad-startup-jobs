@@ -45,6 +45,11 @@ export class ApiRequestError extends Error {
 async function request<T>(path: string, init?: RequestInit & { token?: string | null }): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
+  // The development tunnel is an ngrok free-plan endpoint. Without this
+  // documented header ngrok serves an HTML interstitial (with status 200)
+  // instead of the API response when the request comes from a browser, which
+  // makes res.json() throw. It is ignored by non-ngrok origins.
+  headers.set("ngrok-skip-browser-warning", "true");
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }

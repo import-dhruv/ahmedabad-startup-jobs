@@ -134,7 +134,10 @@ export function CandidateDashboard() {
       const res = await fetch(`${API_URL}/me/profile/resume`, {
         method: "POST",
         body: form,
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
+        },
       });
       if (!res.ok) throw new Error("upload failed");
       toast.success("Resume uploaded");

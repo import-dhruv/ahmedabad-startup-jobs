@@ -43,3 +43,4 @@ celerybeat-schedule
 celerybeat-schedule-shm
 celerybeat-schedule-wal
 *.pid
+.vercel
