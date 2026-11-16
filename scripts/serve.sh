@@ -96,6 +96,11 @@ case "${1:-start}" in
     sleep 2
     start_api
     ;;
+  restart-beat)
+    kill_matching "celery -A app.workers.celery_app.celery_app beat"
+    sleep 2
+    start_beat
+    ;;
   restart-tunnel)
     kill_matching "ngrok http 8000"
     sleep 2

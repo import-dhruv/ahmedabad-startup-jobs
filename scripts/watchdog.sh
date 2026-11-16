@@ -29,8 +29,12 @@ check_tunnel() {
   [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 "$url/health" 2>/dev/null)" = "200" ]
 }
 
-check_workers() {
-  ps -eo args | grep -q "[c]elery -A app.workers"
+check_worker() {
+  ps -eo args | grep -q "[c]elery -A app.workers.*worker"
+}
+
+check_beat() {
+  ps -eo args | grep -q "[c]elery -A app.workers.*beat"
 }
 
 while true; do
@@ -46,11 +50,19 @@ while true; do
     fi
   fi
 
-  if check_workers; then
+  if check_worker; then
     :
   else
     echo "[watchdog] Celery worker missing — restarting the stack"
     "$ROOT/scripts/serve.sh" restart >/dev/null 2>&1
+    BACKOFF=15
+  fi
+
+  if check_beat; then
+    :
+  else
+    echo "[watchdog] Celery beat missing — restarting the scheduler"
+    "$ROOT/scripts/serve.sh" restart-beat >/dev/null 2>&1
     BACKOFF=15
   fi
 
