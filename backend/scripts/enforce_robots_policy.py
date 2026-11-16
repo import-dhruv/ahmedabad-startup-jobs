@@ -45,7 +45,8 @@ ENDPOINT_BY_CONNECTOR: dict[str, str] = {
 }
 
 
-async def main() -> None:
+async def audit_robots_policy() -> dict[str, object]:
+    """Audit every registered connector source and return what changed."""
     removed_sources: list[str] = []
     removed_jobs = 0
 
@@ -102,9 +103,18 @@ async def main() -> None:
 
         await session.commit()
 
+    return {
+        "deactivated_sources": removed_sources,
+        "removed_listings": removed_jobs,
+    }
+
+
+async def main() -> None:
+    result = await audit_robots_policy()
+    sources = result["deactivated_sources"]
     print(
-        f"robots audit complete: {len(removed_sources)} source(s) deactivated "
-        f"({', '.join(removed_sources) or 'none'}), {removed_jobs} listing(s) removed"
+        f"robots audit complete: {len(sources)} source(s) deactivated "
+        f"({', '.join(sources) or 'none'}), {result['removed_listings']} listing(s) removed"
     )
 
 

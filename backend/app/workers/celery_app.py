@@ -63,6 +63,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.enrich_jobs_with_ai",
         "schedule": crontab(minute=7, hour=6),
     },
+    # Daily: re-check every connector against its host's robots.txt.
+    "robots-policy": {
+        "task": "app.workers.tasks.enforce_robots_policy",
+        "schedule": crontab(minute=53, hour=5),
+    },
     # Every 10 minutes: dispatch alerts for newly discovered jobs.
     "dispatch-alerts": {
         "task": "app.workers.tasks.dispatch_job_alerts",

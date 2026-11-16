@@ -185,7 +185,7 @@ The current tunnel URL is written to `/tmp/ahsj-tunnel-url`.
 - [x] Database migrations applied
 - [x] Worker and beat scheduler running on this host
 - [x] `scripts/serve.sh status` reports a healthy API and tunnel
-- [ ] `scripts/enforce_robots_policy.py` scheduled daily
-- [ ] `scripts/seed.py` run once to populate the board
-- [ ] An administrator account created
-- [ ] The GitHub repository pushed
+- [x] Robots policy audited daily by the `robots-policy` Celery beat task
+- [x] `scripts/seed.py` run once to populate the board
+- [x] An administrator account created (`admin@ahmedabadstartupjobs.com`)
+- [x] The GitHub repository pushed and connected to Vercel for auto-deploy

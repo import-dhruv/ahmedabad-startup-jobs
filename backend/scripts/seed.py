@@ -249,14 +249,18 @@ CANDIDATE_DOMAINS: list[str] = [
 async def ensure_aggregator_sources(session, client: PoliteClient | None = None) -> None:
     """Register the public feeds, skipping any whose robots.txt forbids reading them."""
     for spec in AGGREGATOR_SOURCES:
+        existing = (
+            await session.execute(select(JobSource).where(JobSource.slug == spec["slug"]))
+        ).scalar_one_or_none()
         if client is not None:
             allowed = await client._robots_allows(spec["base_url"])
             if not allowed:
                 log.warning("source_skipped_robots", slug=spec["slug"], url=spec["base_url"])
+                # A previously registered source must not be brought back to
+                # life just because the seed script was run again.
+                if existing is not None and existing.is_active:
+                    existing.is_active = False
                 continue
-        existing = (
-            await session.execute(select(JobSource).where(JobSource.slug == spec["slug"]))
-        ).scalar_one_or_none()
         if existing is not None:
             if not existing.is_active:
                 existing.is_active = True

@@ -375,3 +375,13 @@ def refresh_source_health() -> dict[str, Any]:
             return {"sources": len(sources)}
 
     return _run_async(_run())
+
+
+@shared_task(name="app.workers.tasks.enforce_robots_policy")
+def enforce_robots_policy() -> dict[str, Any]:
+    """Daily robots.txt audit: deactivate sources whose endpoints are disallowed."""
+    from scripts.enforce_robots_policy import audit_robots_policy
+
+    result = _run_async(audit_robots_policy())
+    log.info("robots_policy_audit", **result)
+    return result
